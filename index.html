@@ -8,24 +8,17 @@
 </head>
 <body>
   <div id="app">
-    <p>{{message}} -- -- 123{{a.a}} </p>
-    <ul>
-      <li>{{message}}</li>
-    </ul>
-    <input type="text" v-model="message">
+    <p>{{message}} </p>
   </div>
   <script src="./watcher.js"></script>
-  <script src="./compile.js"></script>
   <script src="./observer.js"></script>
+  <script src="./compile.js"></script>
   <script src="./MVVM.js"></script>
   <script>
     const vm = new MVVM({
       el:"#app",
       data:{
         message:"123",
-        a:{
-          a:"ghjkl"
-        }
       }
     });
   </script>

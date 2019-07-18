@@ -112,15 +112,15 @@ const CompileUtils = {
   },
   text(node, vm, expr) {
     const textUpdater = this.updater['textUpdater'];
-
+    // 模版
     const value = this.getTextVal(vm, expr);
-
+    // 添加订阅
     expr.replace(/\{\{([^}]+)\}\}/g, (...args) => {
       new Warcher(vm, args[1], () => {
         textUpdater && textUpdater(node, this.getTextVal(vm, expr));
       });
     });
-
+    // 更新视图
     textUpdater && textUpdater(node, value);
 
   },
