@@ -1,5 +1,14 @@
 # 前端 mvvm 实现
 
+## 2019-08-30 更新proxy实现
+>[MDN 元编程](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Guide/Meta_programming),[MDN Proxy](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Proxy),[MDN Reflect](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Reflect),
+
+> 个人感觉 mvvm还是 proxy(解决数组) 和 Object.defineProperty (对象每个key监听)  
+> 如果监听数组的话还是需要监听一下`length`属性的  
+> 单独proxy实现mvvm资源太浪费的
+
+#### 代码在 [mvvm-proxy.html](./mvvm-proxy.html)
+
 ## 放上一张图
 
 ![mvvm](2.png)

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+</head>
+<body>
+	
+	<div id="app">
+		<a href="">{{a}}///{{b}}</a>
+		<p v-text="b"></p>
+		<p v-text="c.a"></p>
+		<p>{{s[0]}}</p>
+		<p>{{s}}</p>
+		<input type="text" v-model="c.a">
+		<input type="text" v-model="a">
+	</div>
+
+	<script>
+
+		class Dep {
+		    constructor() {
+		        this.subs = [] // 定义数组
+		    }
+		    // 订阅函数
+		    addSub(sub) {
+		        this.subs.push(sub)
+		    }
+		    // 发布函数
+		    notify() {
+		        this.subs.filter(item => true).forEach(sub => sub.update())
+		    }
+		}
+
+		class Watcher {
+		    constructor (vm, exp,fn) {
+		        this.vm = vm // 传进来的vm
+		        this.exp = exp // 传进来的匹配到exp 例如："language"，"makeUp.one"
+		        this.key = exp.split('.').shift();
+		        this.fn = fn;
+		        const keylist = exp.split('.');
+
+		        Dep.target = this // 给Dep类挂载一个watcher对象，跟新的时候就用到了
+
+		        const val = keylist.reduce((data,item)=>{
+		        	return data[item];
+		        }, this.vm);
+
+		        if(Array.isArray(val)){
+		        	// 如果是数组就再订阅一下 length的状态 如果改变就更新
+		        	val.length;
+		        }
+
+		        Dep.target = null // 添加了订阅之后，把Dep.target清空
+		    }
+		    update() {
+		        // 设置值会触发vm.proxy.set函数，然后调用发布的notify，
+		        // 最后调用update，update里面继续调用this.fn(val)
+		       this.fn();
+		       console.log(this.exp, "更新");
+		    }
+		}
+
+		class Observe{
+			constructor(data) {
+			    return this.observe(data);
+			}
+			observe(data){
+				if (!data || typeof data !== 'object') return data // 如果不是对象直接返回值
+			    
+			    for(let key in data){
+					data[key] = this.observe(data[key]);
+				}
+
+				data = this.proxy(data);
+			    return data; // 对象调用Observe
+			}
+			proxy(data) {
+				const dep = new Dep();
+
+				const self = this;
+				return new Proxy(data, {
+					get(target, key){
+						Dep.target && dep.addSub(Dep.target);
+						return Reflect.get(target, key);
+					},
+					set(target, key, value,receiver){
+						const result = Reflect.set(target, key, self.observe(value),receiver);
+						dep.notify();
+						return result;
+					}
+				});
+			}
+		}
+
+
+		const CompileUtils = {
+			// 解析模版
+			getTextVal(vm,expr){
+				// 讲[x]转换成.x
+				expr = this.toPoint(expr);
+				return expr.replace(/\{\{([^}]+)\}\}/g, (...args) => {
+			      return this.getVal(vm, args[1]);
+			    });
+			},
+			toPoint(str){
+				return str.replace(/\[(.*?)\]/g,(cStr,key)=>{
+					return '.'+key;
+				});
+			},
+			// 获取当个数据的
+			getVal(vm,expr){
+				return expr.split('.').reduce((data,item)=>{
+					return data[item];
+				}, vm);
+			},
+			// 更新数据
+			updateText(node,val){
+				node.textContent = val;
+			},
+			// 更新数据
+			updateValue(node,val){
+				node.value = val;
+			},
+			setVal(vm, expr, value) {
+				// 讲[x]转换成.x
+				expr = this.toPoint(expr);
+			    expr = expr.split(".");
+			    return expr.reduce((prev, next, currentIndex) => {
+			      if (currentIndex == expr.length - 1) {
+			        return prev[next] = value;
+			      }
+			      return prev[next];
+			    }, vm);
+			},
+			textNode(node,vm){
+				const text = node.textContent;
+				text.replace(/\{\{([^}]+)\}\}/g, (cstr,expr)=>{
+					expr = this.toPoint(expr);
+					new Watcher(vm, expr,()=>{
+						this.updateText && this.updateText(node,this.getTextVal(vm, text));
+					});
+				});
+			},
+			// 指令
+			text(node, vm, expr){
+				expr = this.toPoint(expr);
+				// 监听
+				new Watcher(vm,expr,()=>{
+					this.updateText(node,this.getVal(vm, expr));
+				});
+				// 初始化dom
+				const value = this.getVal(vm, expr);
+				this.updateText(node,value);
+			},
+			model(node, vm, expr){
+				expr = this.toPoint(expr);
+				// 只需要负责更新和初始化就好了 这里 不需要订阅
+				node.addEventListener('input',(event)=>{
+					const newValue = event.target.value;
+      				this.setVal(vm, expr, newValue);
+				});
+				// 如果其他地方修改的话依然需要订阅 
+				// 比如 手动修改当前的值 如果不订阅就不会改变value值
+				new Watcher(vm,expr,()=>{
+					this.updateValue(node,this.getVal(vm, expr));
+				});
+				// 初始化dom
+				const value = this.getVal(vm, expr);
+				this.updateValue(node,value);
+			}
+		}
+
+
+
+		class Compile{
+
+			constructor (el, vm) {
+		      this.vm = vm;
+		      this.element = document.querySelector(el);
+		      this.fragment = document.createDocumentFragment();
+		      this.init();
+		    }
+			init() {
+			// DOM 相关
+			  let element = this.element
+			  this.fragment.append(element)
+			  this.replace(this.fragment)
+			  document.body.appendChild(this.fragment)
+			}
+
+			replace(dom) {
+				// 递归 dom
+
+				const childNodes = dom.childNodes;
+				const regText = /\{\{(.*?)\}\}/g;
+				const regAttr = /^v-(.*?)$/;
+				// /^v-(.*?)$/
+
+				Array.from(childNodes).forEach(node=>{
+
+					// 这里形成了一个闭包 导致 text 等变量一直存在
+						const text = node.textContent;
+
+					//  是元素节点的时候
+					if(node.nodeType === 1){
+
+						// 递归 调用 且 判断 参数v-
+						this.replace(node);
+						const attrs = Array.from(node.attributes);
+						attrs.forEach(attr=>{
+							const {name, value} = attr;
+
+							if(regAttr.test(name)){
+								const [,directiveName] = name.match(regAttr);
+
+								CompileUtils[directiveName] && CompileUtils[directiveName](node,this.vm,value);
+							}
+
+						});
+
+					}else if(node.nodeType  === 3){ // 文本节点
+
+						// 判断 解析 模版语法
+						if(regText.test(text)){
+
+							// 绑定订阅者
+							CompileUtils.textNode(node,this.vm);
+							// 初始化
+							const value = CompileUtils.getTextVal(this.vm, text);
+							CompileUtils.updateText(node, value);
+						}
+
+					}
+
+				});
+			}
+
+		}
+
+		class MVVM{
+			constructor({el,data}){
+				this.$data = new Observe(data);
+				new Compile(el,this.$data);
+				return this._init();
+			}
+			_init(){
+				// 讲$data 绑定到this
+				const _this = this;
+				return new Proxy(this, {
+					get(target, key){
+						return target[key] || target.$data[key];
+					},
+					set(target, key, value){
+						// 这里设置的话直接绑定到当前this 不用绑定到$data 减少资源浪费
+						Reflect.set(target.$data, key, value);
+					}
+				});
+			}
+		}
+		const vm = new MVVM({
+			el:"#app",
+			data: {
+				a:1,
+				b:2,
+				s:[{a:2},2],
+				c:{
+					a:12
+				}
+			}
+		});
+
+
+	</script>
+
+
+</body>
+</html>

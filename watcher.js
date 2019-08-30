@@ -1,4 +1,4 @@
-class Warcher {
+class    {
   constructor(vm, expr, cb) {
     this.vm = vm;
     this.expr = expr;
